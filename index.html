@@ -64,6 +64,14 @@ button{background:none;border:none;cursor:pointer}
 .clk-who .who{font-family:var(--cond);font-size:25px;font-weight:700;letter-spacing:.01em;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #clock.mine .clk-who .who{color:var(--you)}
 .clk-who .sub{font-size:11px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clk-act{display:flex;align-items:center;padding:0 12px;border-left:1px solid var(--line)}
+.clk-act button{
+  font-family:var(--cond);font-weight:700;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink3);border:1px solid var(--line2);border-radius:var(--r);padding:6px 11px;white-space:nowrap;
+}
+.clk-act button:hover{color:var(--warn);border-color:var(--warn);background:rgba(232,150,74,.08)}
+.clk-act button:disabled{opacity:.3;cursor:default}
+.clk-act button:disabled:hover{color:var(--ink3);border-color:var(--line2);background:none}
 .clk-next{
   display:flex;flex-direction:column;justify-content:center;padding:0 16px;
   border-left:1px solid var(--line);min-width:132px;
@@ -349,13 +357,13 @@ select.teampick:hover{border-color:var(--you)}
 }
 #bd th.me{color:var(--you)}
 #bd th.rh{width:40px;left:0;z-index:7}
-#bd td.rd{
+#bd td.brd{
   position:sticky;left:0;z-index:4;background:var(--ground);width:40px;text-align:center;
   font-family:var(--mono);font-size:11px;color:var(--ink3);border-right:1px solid var(--line);
   border-bottom:1px solid rgba(34,59,68,.45);
 }
-#bd td.rd i{display:block;font-style:normal;font-size:8px;opacity:.55}
-#bd td.pk{padding:0;border-bottom:1px solid rgba(34,59,68,.45);border-right:1px solid rgba(34,59,68,.3)}
+#bd td.brd i{display:block;font-style:normal;font-size:8px;opacity:.55}
+#bd td.bp{padding:0;border-bottom:1px solid rgba(34,59,68,.45);border-right:1px solid rgba(34,59,68,.3)}
 .bcell{
   display:block;padding:4px 6px;min-height:42px;cursor:pointer;
   border-left:2px solid transparent;
@@ -473,6 +481,9 @@ select.teampick:hover{border-color:var(--you)}
       <div class="lbl" id="ckLbl">On the clock</div>
       <div class="who" id="ckWho">—</div>
       <div class="sub" id="ckSub"></div>
+    </div>
+    <div class="clk-act">
+      <button id="bSkip" title="Advance past this pick without assigning a player">Skip pick</button>
     </div>
     <div class="clk-next">
       <div class="lbl">Your next pick</div>
@@ -1064,6 +1075,7 @@ function render(){ renderChrome(); renderClock(); renderLeft(); renderCenter(); 
 function renderClock(){
   const s=onClock(), c=$('clock');
   $('bMore').disabled = !s;
+  $('bSkip').disabled = !s;
   if(!s){
     c.classList.remove('mine');
     $('ckLabel').textContent='—'; $('ckOf').textContent='complete';
@@ -1083,7 +1095,13 @@ function renderClock(){
   $('ckSub').textContent=sub;
   const nx=MYPICKS.find(m=>m.i>=cursor());
   $('ckNext').textContent = !nx ? 'none left' : (nx.i===cursor() ? 'NOW · '+nx.label : nx.label+'  ·  in '+(nx.i-cursor()));
-  $('bUndo').disabled = !S.picks.length;
+  const nb=$('bUndo');
+  nb.disabled = !S.picks.length;
+  if(S.picks.length){
+    const k=S.picks[S.picks.length-1];
+    nb.title='Undo '+LIVE[S.picks.length-1].label+' \u2014 '+
+      (k.p>=0?P[k.p].name : k.p===-2?'skipped pick':k.n)+'  (Ctrl+Z)';
+  } else nb.title='Nothing to undo';
 }
 
 function renderLeft(){
@@ -1298,12 +1316,12 @@ function renderBoard(){
     MGRS.map(m=>'<th'+(m===YOU?' class="me"':'')+' title="'+esc(TEAM[m])+'">'+esc(m)+'</th>').join('')+
     '</tr></thead><tbody>';
   for(let r=1;r<=CFG.rounds;r++){
-    h+='<tr><td class="rd">'+r+'<i>'+(r%2?'\u2192':'\u2190')+'</i></td>';
+    h+='<tr><td class="brd">'+r+'<i>'+(r%2?'\u2192':'\u2190')+'</i></td>';
     MGRS.forEach(m=>{
       const e=BOARD.find(b=>b.round===r && b.orig===m);
-      if(!e){ h+='<td class="pk"></td>'; return; }
+      if(!e){ h+='<td class="bp"></td>'; return; }
       if(e.keeper){
-        h+='<td class="pk"><span class="bcell kept" style="border-left-color:var(--'+e.keeper.pos+')" data-kp="'+r+'|'+m+'">'+
+        h+='<td class="bp"><span class="bcell kept" style="border-left-color:var(--'+e.keeper.pos+')" data-kp="'+r+'|'+m+'">'+
           '<span class="lb"><span>'+e.label+'</span><span>KEEP</span></span>'+
           '<span class="pn">'+esc(e.keeper.player)+'</span></span></td>';
         return;
@@ -1321,7 +1339,7 @@ function renderBoard(){
         else nm=k.n;
       } else if(i===cur) nm='on the clock';
       const moved = own!==e.orig ? '<b>\u2192'+own+'</b>' : (e.traded?'<b>'+own+'</b>':'');
-      h+='<td class="pk"><span class="'+cls.join(' ')+'" style="border-left-color:'+accent+'" data-pk="'+i+'">'+
+      h+='<td class="bp"><span class="'+cls.join(' ')+'" style="border-left-color:'+accent+'" data-pk="'+i+'">'+
         '<span class="lb"><span>'+e.label+'</span>'+moved+'</span>'+
         '<span class="pn">'+esc(nm)+'</span></span></td>';
     });
@@ -1454,7 +1472,9 @@ function openMenu(x,y,title,items){
   m.style.top=Math.min(y,innerHeight-h-8)+'px';
   m.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; m.classList.remove('on'); items[+b.dataset.k].fn(); };
 }
-document.addEventListener('click',e=>{ if(!e.target.closest('#menu')) $('menu').classList.remove('on'); });
+document.addEventListener('mousedown',e=>{
+  if(!e.target.closest('#menu')) $('menu').classList.remove('on');
+});
 
 function toast(msg){
   const t=$('toast'); t.textContent=msg; t.classList.add('on');
@@ -1599,6 +1619,7 @@ $('subtabs').addEventListener('click',e=>{
 });
 $('cbHide').onchange=e=>{ S.hide=e.target.checked; save(); renderCenter(); };
 $('bUndo').onclick=undo;
+$('bSkip').onclick=skipPick;
 
 function pickActions(i){
   const cur=cursor(), made=i<cur, k=made?S.picks[i]:null, own=ownerOf(i);
